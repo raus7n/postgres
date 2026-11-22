@@ -27,6 +27,7 @@
 #include "optimizer/optimizer.h"
 #include "rewrite/rewriteManip.h"
 #include "utils/fmgroids.h"
+#include "utils/inval.h"
 #include "utils/partcache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
@@ -362,6 +363,27 @@ update_default_partition_oid(Oid parentId, Oid defaultPartId)
 
 	heap_freetuple(tuple);
 	table_close(pg_partitioned_table, RowExclusiveLock);
+}
+
+/*
+ * invalidate_default_partition_relcache
+ *
+ * Invalidate the relcache entry of the given default partition, whose
+ * partition constraint depends on the bounds of every other partition of
+ * its parent.  If the default partition is itself partitioned, do the same
+ * for all of its descendants, because their partition constraints include
+ * the default partition's constraint.
+ */
+void
+invalidate_default_partition_relcache(Oid defaultPartId)
+{
+	List	   *all_parts;
+	ListCell   *lc;
+
+	all_parts = find_all_inheritors(defaultPartId, AccessExclusiveLock, NULL);
+	foreach(lc, all_parts)
+		CacheInvalidateRelcacheByRelid(lfirst_oid(lc));
+	list_free(all_parts);
 }
 
 /*

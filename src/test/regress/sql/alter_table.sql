@@ -3244,6 +3244,23 @@ alter table defpart_attach_test attach partition defpart_attach_test_2 for value
 
 drop table defpart_attach_test;
 
+-- check that sub-partitions of a partitioned default partition see the
+-- updated default partition constraint when a sibling partition is
+-- created, detached or dropped
+create table defpart_sub_test (a int) partition by list (a);
+create table defpart_sub_test1 partition of defpart_sub_test for values in (1);
+create table defpart_sub_test_d partition of defpart_sub_test default partition by list (a);
+create table defpart_sub_test_dd partition of defpart_sub_test_d default;
+insert into defpart_sub_test values (2);
+alter table defpart_sub_test detach partition defpart_sub_test1;
+insert into defpart_sub_test values (1);	-- ok
+create table defpart_sub_test3 partition of defpart_sub_test for values in (3);
+insert into defpart_sub_test_dd values (3);	-- error
+drop table defpart_sub_test3;
+insert into defpart_sub_test values (3);	-- ok
+select tableoid::regclass, a from defpart_sub_test order by a;
+drop table defpart_sub_test, defpart_sub_test1;
+
 -- check combinations of temporary and permanent relations when attaching
 -- partitions.
 create table perm_part_parent (a int) partition by list (a);
